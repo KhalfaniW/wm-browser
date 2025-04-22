@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Custom Browser with Puppeteer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: Ubuntu, Arial, sans-serif;
+      height: 100vh;
+      background-color: #3a3a3a;
+      color: #ffffff;
+    }
+    .browser-controls {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .url-bar {
+      display: flex;
+      margin-bottom: 10px;
+    }
+    .url-bar input {
+      flex: 1;
+      padding: 5px;
+      font-size: 16px;
+    }
+    .url-bar button {
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="browser-controls">
+    <div class="url-bar">
+      <input type="text" id="url" placeholder="Enter URL...">
+      <button id="go">Go</button>
+    </div>
+    <div id="content">
+      <p>Custom browser content will go here.</p>
+    </div>
+  </div>
+</body>
+</html>
