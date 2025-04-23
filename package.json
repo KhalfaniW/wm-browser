@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "electron": "^35.2.0",
-    "puppeteer": "^24.7.0"
+    "puppeteer": "^24.7.0",
+    "rxjs": "^7.8.2"
   }
 }

@@ -3,6 +3,8 @@ const puppeteer = require("puppeteer");
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { Subject } = require("rxjs");
+const { debounceTime } = require("rxjs/operators");
 
 // Setup logging
 const logFile = path.join(__dirname, "window-events.log");
@@ -15,6 +17,10 @@ function logEvent(eventType, details) {
 let mainWindow;
 let browser;
 let puppeteerWindowId;
+let lastBounds = null;
+
+// Create a Subject for window move events
+const windowMoveSubject = new Subject();
 
 // Function to get window ID by title (using xdotool)
 function getWindowIdByTitle(title) {
@@ -32,42 +38,54 @@ function getWindowIdByTitle(title) {
 }
 
 // Function to position the Puppeteer window
-async function positionPuppeteerWindow(event) {
+function positionPuppeteerWindow(event) {
   if (!puppeteerWindowId) return;
-
-  const startTime = Date.now();
 
   // Get Electron window position and size
   const bounds = mainWindow.getBounds();
-  const rightHalfX = bounds.x + Math.floor(bounds.width / 2);
-  const rightHalfWidth = Math.floor(bounds.width / 2);
+  lastBounds = bounds;
+
+  // Log start of move intent
   logEvent("window-move-start", {
     id: puppeteerWindowId,
     triggeredBy: event ? "move-event" : "manual-position",
     event: event ? event.type : null,
     bounds,
   });
-  // Use xdotool to position and resize the Puppeteer window
-  await new Promise((resolve) => {
-    exec(
-      `xdotool windowmove --sync ${puppeteerWindowId} ${rightHalfX} ${bounds.y} windowsize ${puppeteerWindowId} ${rightHalfWidth} ${bounds.height}`,
-      (error) => {
-        const endTime = Date.now();
-        const duration = endTime - startTime;
 
-        // Log the move event with duration
-        logEvent("window-move-completed", {
-          id: puppeteerWindowId,
-          bounds,
-          triggeredBy: event ? "move-event" : "manual-position",
-          duration_ms: duration,
-          success: !error,
-        });
+  // If this is a manual position (initial setup), do it immediately
+  if (!event) {
+    executeWindowMove(bounds);
+    return;
+  }
 
-        resolve();
-      }
-    );
-  });
+  // Otherwise, emit to subject for debouncing
+  windowMoveSubject.next(bounds);
+}
+
+// Execute the actual window move
+function executeWindowMove(bounds) {
+  const startTime = Date.now();
+  const rightHalfX = bounds.x + Math.floor(bounds.width / 2);
+  const rightHalfWidth = Math.floor(bounds.width / 2);
+
+  // Use a single command for better performance
+  exec(
+    `xdotool windowmove ${puppeteerWindowId} ${rightHalfX} ${bounds.y} windowsize ${puppeteerWindowId} ${rightHalfWidth} ${bounds.height}`,
+    (error) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Log the move event with duration
+      logEvent("window-move-completed", {
+        id: puppeteerWindowId,
+        bounds,
+        triggeredBy: "rxjs-debounced-move",
+        duration_ms: duration,
+        success: !error,
+      });
+    }
+  );
 }
 
 async function createWindows() {
@@ -105,10 +123,19 @@ async function createWindows() {
   }
 
   if (puppeteerWindowId) {
+    // Setup RxJS subscription with proper debouncing
+    windowMoveSubject
+      .pipe(
+        debounceTime(30) // Adjust timing as needed (8ms = ~120fps)
+      )
+      .subscribe((bounds) => {
+        executeWindowMove(bounds);
+      });
+
     // Initial positioning
     positionPuppeteerWindow();
 
-    // Keep Puppeteer window in sync with Electron window movements
+    // Subscribe to window move events
     mainWindow.on("move", (e) => positionPuppeteerWindow(e));
 
     // Clean up when Electron window is closed
