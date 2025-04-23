@@ -1,6 +1,16 @@
 const { app, BrowserWindow } = require("electron");
 const puppeteer = require("puppeteer");
 const { exec } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+// Setup logging
+const logFile = path.join(__dirname, "window-events.log");
+function logEvent(eventType, details) {
+  const timestamp = Date.now();
+  const logEntry = `${timestamp} [${eventType}] ${JSON.stringify(details)}\n`;
+  fs.appendFileSync(logFile, logEntry);
+}
 
 let mainWindow;
 let browser;
@@ -22,18 +32,42 @@ function getWindowIdByTitle(title) {
 }
 
 // Function to position the Puppeteer window
-async function positionPuppeteerWindow() {
+async function positionPuppeteerWindow(event) {
   if (!puppeteerWindowId) return;
+
+  const startTime = Date.now();
 
   // Get Electron window position and size
   const bounds = mainWindow.getBounds();
   const rightHalfX = bounds.x + Math.floor(bounds.width / 2);
   const rightHalfWidth = Math.floor(bounds.width / 2);
-
+  logEvent("window-move-start", {
+    id: puppeteerWindowId,
+    triggeredBy: event ? "move-event" : "manual-position",
+    event: event ? event.type : null,
+    bounds,
+  });
   // Use xdotool to position and resize the Puppeteer window
-  exec(
-    `xdotool windowmove ${puppeteerWindowId} ${rightHalfX} ${bounds.y} windowsize ${puppeteerWindowId} ${rightHalfWidth} ${bounds.height}`
-  );
+  await new Promise((resolve) => {
+    exec(
+      `xdotool windowmove --sync ${puppeteerWindowId} ${rightHalfX} ${bounds.y} windowsize ${puppeteerWindowId} ${rightHalfWidth} ${bounds.height}`,
+      (error) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        // Log the move event with duration
+        logEvent("window-move-completed", {
+          id: puppeteerWindowId,
+          bounds,
+          triggeredBy: event ? "move-event" : "manual-position",
+          duration_ms: duration,
+          success: !error,
+        });
+
+        resolve();
+      }
+    );
+  });
 }
 
 async function createWindows() {
@@ -75,7 +109,7 @@ async function createWindows() {
     positionPuppeteerWindow();
 
     // Keep Puppeteer window in sync with Electron window movements
-    mainWindow.on("move", positionPuppeteerWindow);
+    mainWindow.on("move", (e) => positionPuppeteerWindow(e));
 
     // Clean up when Electron window is closed
     mainWindow.on("closed", () => {
