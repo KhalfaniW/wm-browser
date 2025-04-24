@@ -5,6 +5,12 @@ const fs = require("fs");
 const path = require("path");
 const { Subject } = require("rxjs");
 const { debounceTime } = require("rxjs/operators");
+const store = require("./store");
+const {
+  startNavigation,
+  navigationSuccess,
+  navigationFailed,
+} = require("./store/navigationSlice");
 
 // Setup logging
 const logFile = path.join(__dirname, "window-events.log");
@@ -17,7 +23,7 @@ function logEvent(eventType, details) {
 let mainWindow;
 let browser;
 let puppeteerWindowId;
-let puppeteerPage; // Add this to store the page object
+let puppeteerPage;
 let lastBounds = null;
 
 // Create a Subject for window move events
@@ -93,6 +99,9 @@ function executeWindowMove(bounds) {
 async function navigateTo(url) {
   if (!browser) return false;
 
+  // Update Redux state to indicate navigation started
+  store.dispatch(startNavigation());
+
   try {
     // Ensure URL has http/https protocol
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -115,9 +124,13 @@ async function navigateTo(url) {
     // Position the window again in case of any changes
     positionPuppeteerWindow();
 
+    // Update Redux state to indicate successful navigation
+    store.dispatch(navigationSuccess());
     return true;
   } catch (error) {
     console.error(`Navigation error: ${error}`);
+    // Update Redux state to indicate failed navigation
+    store.dispatch(navigationFailed(error.message));
     return false;
   }
 }
@@ -162,13 +175,9 @@ async function createWindows() {
 
   if (puppeteerWindowId) {
     // Setup RxJS subscription with proper debouncing
-    windowMoveSubject
-      .pipe(
-        debounceTime(30) // Adjust timing as needed (8ms = ~120fps)
-      )
-      .subscribe((bounds) => {
-        executeWindowMove(bounds);
-      });
+    windowMoveSubject.pipe(debounceTime(30)).subscribe((bounds) => {
+      executeWindowMove(bounds);
+    });
 
     // Initial positioning
     positionPuppeteerWindow();
@@ -185,6 +194,17 @@ async function createWindows() {
     // Set up IPC handler for navigation
     ipcMain.handle("navigate", async (event, url) => {
       return navigateTo(url);
+    });
+
+    // Subscribe to Redux store changes in main process
+    store.subscribe(() => {
+      const state = store.getState().navigation;
+      // Log navigation state changes
+      logEvent("navigation-state-change", {
+        status: state.status,
+        url: state.currentUrl,
+        error: state.error,
+      });
     });
   }
 }
