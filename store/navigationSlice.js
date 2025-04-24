@@ -30,6 +30,12 @@ const navigationSlice = createSlice({
       state.status = "idle";
       state.error = null;
     },
+    // Action to trigger puppeteer navigation from saga
+    puppeteerNavigateRequested: (state, action) => {
+      state.status = "loading";
+      state.error = null;
+      state.currentUrl = action.payload;
+    },
   },
 });
 
