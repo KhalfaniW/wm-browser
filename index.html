@@ -1,45 +1,52 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Custom Browser with Puppeteer</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 10px;
-      font-family: Ubuntu, Arial, sans-serif;
-      height: 100vh;
-      background-color: #3a3a3a;
-      color: #ffffff;
-    }
-    .browser-controls {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    .url-bar {
-      display: flex;
-      margin-bottom: 10px;
-    }
-    .url-bar input {
-      flex: 1;
-      padding: 5px;
-      font-size: 16px;
-    }
-    .url-bar button {
-      padding: 5px 10px;
-      font-size: 16px;
-    }
-  </style>
-</head>
-<body>
-  <div class="browser-controls">
-    <div class="url-bar">
-      <input type="text" id="url" placeholder="Enter URL...">
-      <button id="go">Go</button>
-    </div>
-    <div id="content">
-      <p>Custom browser content will go here.</p>
-    </div>
-  </div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Split Browser</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+      }
+
+      #url-form {
+        width: 100%;
+        display: flex;
+        margin-bottom: 10px;
+      }
+
+      #url-input {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 3px 0 0 3px;
+        font-size: 14px;
+      }
+
+      #submit-button {
+        padding: 8px 12px;
+        background-color: #4285f4;
+        color: white;
+        border: none;
+        border-radius: 0 3px 3px 0;
+        cursor: pointer;
+      }
+
+      #status {
+        margin-top: 8px;
+        color: #555;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="url-form">
+      <input type="text" id="url-input" placeholder="Enter URL..." />
+      <button type="submit" id="submit-button">Go</button>
+    </form>
+    <div id="status"></div>
+
+    <script src="renderer.js"></script>
+  </body>
 </html>

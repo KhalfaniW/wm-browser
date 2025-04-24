@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const puppeteer = require("puppeteer");
 const { exec } = require("child_process");
 const fs = require("fs");
@@ -17,6 +17,7 @@ function logEvent(eventType, details) {
 let mainWindow;
 let browser;
 let puppeteerWindowId;
+let puppeteerPage; // Add this to store the page object
 let lastBounds = null;
 
 // Create a Subject for window move events
@@ -88,6 +89,39 @@ function executeWindowMove(bounds) {
   );
 }
 
+// Function to navigate Puppeteer to a new URL
+async function navigateTo(url) {
+  if (!browser) return false;
+
+  try {
+    // Ensure URL has http/https protocol
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+
+    // If we don't have the page yet, get it
+    if (!puppeteerPage) {
+      const pages = await browser.pages();
+      puppeteerPage = pages[0];
+    }
+
+    // Navigate to the URL
+    await puppeteerPage.goto(url);
+
+    // Update window ID with new title (may have changed)
+    const title = await puppeteerPage.title();
+    puppeteerWindowId = await getWindowIdByTitle(title);
+
+    // Position the window again in case of any changes
+    positionPuppeteerWindow();
+
+    return true;
+  } catch (error) {
+    console.error(`Navigation error: ${error}`);
+    return false;
+  }
+}
+
 async function createWindows() {
   // Create main Electron window
   mainWindow = new BrowserWindow({
@@ -114,6 +148,10 @@ async function createWindows() {
 
   // Wait for browser to open
   await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Get the page object for later use
+  const pages = await browser.pages();
+  puppeteerPage = pages[0];
 
   // Get Puppeteer window ID using xdotool
   puppeteerWindowId = await getWindowIdByTitle("Example Domain");
@@ -142,6 +180,11 @@ async function createWindows() {
     mainWindow.on("closed", () => {
       if (browser) browser.close();
       mainWindow = null;
+    });
+
+    // Set up IPC handler for navigation
+    ipcMain.handle("navigate", async (event, url) => {
+      return navigateTo(url);
     });
   }
 }
